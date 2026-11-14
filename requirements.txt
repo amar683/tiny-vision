@@ -1,0 +1,8 @@
+torch>=2.5
+torchvision
+datasets
+pillow
+opencv-python-headless
+numpy
+mcp>=2.3
+transformers

@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Training outputs, checkpoints, exports (weights go to Hugging Face, not git)
+runs/
+hf_export/
+*.pt
+*.safetensors
+*.gguf
+
+# Media and logs
+*.mp4
+*.mov
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
