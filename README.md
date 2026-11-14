@@ -17,7 +17,7 @@ image / video frames → VisionEncoder (ViT) → Adapter → tiny caption decode
 ## Setup
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/tiny-vision && cd tiny-vision
+git clone https://github.com/amar683/tiny-vision && cd tiny-vision
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
 ```
 

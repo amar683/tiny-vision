@@ -50,7 +50,7 @@ embeddings through small per-LLM adapters later.
 ## Usage
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/tiny-vision && cd tiny-vision
+git clone https://github.com/amar683/tiny-vision && cd tiny-vision
 uv venv && uv pip install -r requirements.txt
 python caption.py --run amartomar683/tiny-vision-flickr8k photo.jpg
 python caption.py --run amartomar683/tiny-vision-flickr8k clip.mp4 --every 2
