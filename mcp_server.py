@@ -25,7 +25,7 @@ from PIL import Image, UnidentifiedImageError  # noqa: E402
 from caption import VIDEO_EXT, caption_images, load_run  # noqa: E402
 from vlm.video import build_timeline, format_timeline, sample_frames  # noqa: E402
 
-HF_REPO = "YOUR-HF-USERNAME/tiny-vision-flickr8k"  # set after uploading the model
+HF_REPO = "amartomar683/tiny-vision-flickr8k"  # set after uploading the model
 LOCAL_RUN = ROOT / "runs" / "flickr8k"
 MODEL_SOURCE = os.environ.get("TINY_VISION_MODEL") or os.environ.get("TINY_VISION_RUN") or (
     str(LOCAL_RUN) if LOCAL_RUN.is_dir() else HF_REPO)

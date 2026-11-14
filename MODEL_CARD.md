@@ -52,8 +52,8 @@ embeddings through small per-LLM adapters later.
 ```bash
 git clone https://github.com/YOUR-GITHUB-USERNAME/tiny-vision && cd tiny-vision
 uv venv && uv pip install -r requirements.txt
-python caption.py --run YOUR-HF-USERNAME/tiny-vision-flickr8k photo.jpg
-python caption.py --run YOUR-HF-USERNAME/tiny-vision-flickr8k clip.mp4 --every 2
+python caption.py --run amartomar683/tiny-vision-flickr8k photo.jpg
+python caption.py --run amartomar683/tiny-vision-flickr8k clip.mp4 --every 2
 ```
 
 It also ships as an MCP server (`mcp_server.py`) with `caption_image` and `describe_video`

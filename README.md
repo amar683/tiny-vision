@@ -26,8 +26,8 @@ Runs on Apple Silicon (MPS), NVIDIA (CUDA) or CPU.
 ## Use the pretrained model
 
 ```bash
-.venv/bin/python caption.py --run YOUR-HF-USERNAME/tiny-vision-flickr8k photo.jpg
-.venv/bin/python caption.py --run YOUR-HF-USERNAME/tiny-vision-flickr8k clip.mp4 --every 2 --json
+.venv/bin/python caption.py --run amartomar683/tiny-vision-flickr8k photo.jpg
+.venv/bin/python caption.py --run amartomar683/tiny-vision-flickr8k clip.mp4 --every 2 --json
 ```
 
 `--run` takes a Hugging Face repo id (downloaded on first use) or a local folder.
@@ -79,7 +79,7 @@ auto-detected. The best checkpoint (by validation loss) is kept.
 
 ```bash
 .venv/bin/python export_hf.py --run runs/flickr8k --out hf_export/tiny-vision-flickr8k
-hf upload YOUR-HF-USERNAME/tiny-vision-flickr8k hf_export/tiny-vision-flickr8k
+hf upload amartomar683/tiny-vision-flickr8k hf_export/tiny-vision-flickr8k
 ```
 
 The export writes `model.safetensors`, `config.json`, `tokenizer.json` and the model card
