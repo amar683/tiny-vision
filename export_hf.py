@@ -1,9 +1,9 @@
 """Package a training run as a Hugging Face model folder.
 
-  python export_hf.py --run runs/flickr8k --out hf_export/tiny-vision-flickr8k
+  python export_hf.py --run runs/coco_dinov2 --out hf_export/tiny-vision
 
 Writes model.safetensors, config.json, tokenizer.json and README.md (the model card,
-from MODEL_CARD.md). Upload the folder with:  hf upload <user>/tiny-vision-flickr8k hf_export/tiny-vision-flickr8k
+from MODEL_CARD.md). Upload the folder with:  hf upload <user>/tiny-vision hf_export/tiny-vision
 """
 import argparse
 import json
@@ -16,8 +16,8 @@ from safetensors.torch import save_file
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", default="runs/flickr8k")
-    ap.add_argument("--out", default="hf_export/tiny-vision-flickr8k")
+    ap.add_argument("--run", default="runs/coco_dinov2")
+    ap.add_argument("--out", default="hf_export/tiny-vision")
     ap.add_argument("--card", default="MODEL_CARD.md")
     args = ap.parse_args()
 

@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .encoder import VisionEncoder
+from .encoder import build_encoder
 from .layers import Block, init_weights
 
 
@@ -24,10 +24,12 @@ class Projector(nn.Module):
 
 
 class Captioner(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, load_pretrained=False):
         super().__init__()
         self.cfg = cfg
-        self.encoder = VisionEncoder(cfg)
+        # load_pretrained: fetch pretrained encoder weights (training); otherwise they come
+        # from our own checkpoint.
+        self.encoder = build_encoder(cfg, load_weights=load_pretrained)
         self.adapter = Projector(cfg.enc_dim, cfg.dec_dim)
         self.tok = nn.Embedding(cfg.vocab_size, cfg.dec_dim)
         self.text_pos = nn.Parameter(torch.zeros(1, cfg.max_text_len, cfg.dec_dim))
@@ -43,8 +45,8 @@ class Captioner(nn.Module):
         nn.init.trunc_normal_(self.text_pos, std=0.02)
         nn.init.trunc_normal_(self.img_type, std=0.02)
 
-    def num_params(self):
-        return sum(p.numel() for p in self.parameters())
+    def num_params(self, trainable_only=False):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad or not trainable_only)
 
     @staticmethod
     def _prefix_mask(P, T, device):
@@ -72,7 +74,45 @@ class Captioner(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, pixels, bos, eos, temperature=0.0, top_k=None):
+    def beam_search(self, pixels, bos, eos, num_beams=3, length_penalty=1.0):
+        """Keep the num_beams best partial captions at each step; return the best per image.
+
+        Final pick uses log-prob / length**length_penalty, so longer captions aren't
+        unfairly penalized for having more words.
+        """
+        vis = self.encode(pixels)
+        B, K, dev = vis.size(0), num_beams, vis.device
+        vis = vis.repeat_interleave(K, dim=0)                         # (B*K, P, D)
+        ids = torch.full((B * K, 1), bos, dtype=torch.long, device=dev)
+        score = torch.full((B, K), float("-inf"), device=dev)
+        score[:, 0] = 0.0                                              # start from one beam
+        length = torch.zeros(B, K, device=dev)
+        done = torch.zeros(B, K, dtype=torch.bool, device=dev)
+        for _ in range(self.cfg.max_text_len - 1):
+            logp = F.log_softmax(self.decode(vis, ids)[:, -1].float(), -1).view(B, K, -1)
+            V = logp.size(-1)
+            # finished beams can only extend with eos, at no cost, so their score is frozen
+            frozen = torch.full_like(logp, float("-inf"))
+            frozen[..., eos] = 0.0
+            logp = torch.where(done[..., None], frozen, logp)
+            top, idx = (score[..., None] + logp).view(B, K * V).topk(K, dim=-1)
+            beam, word = idx // V, idx % V
+            pick = (beam + torch.arange(B, device=dev)[:, None] * K).flatten()
+            ids = torch.cat([ids[pick], word.flatten()[:, None]], dim=1)
+            prev_done = done.gather(1, beam)
+            length = length.gather(1, beam) + (~prev_done).float()
+            done = prev_done | (word == eos)
+            score = top
+            if done.all():
+                break
+        best = (score / length.clamp(min=1) ** length_penalty).argmax(-1)
+        out = ids.view(B, K, -1)[torch.arange(B, device=dev), best, 1:]
+        return out
+
+    @torch.no_grad()
+    def generate(self, pixels, bos, eos, temperature=0.0, top_k=None, num_beams=1):
+        if num_beams > 1:
+            return self.beam_search(pixels, bos, eos, num_beams)
         vis = self.encode(pixels)
         B = vis.size(0)
         ids = torch.full((B, 1), bos, dtype=torch.long, device=vis.device)

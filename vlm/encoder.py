@@ -79,3 +79,70 @@ class VisionEncoder(nn.Module):
 
         x = x.view(B, T, -1, self.dim) + self.time[:, :T]
         return x.flatten(1, 2)
+
+
+# ---------------------------------------------------------------- frozen pretrained encoder
+
+# facebook/dinov2-small architecture, so the model can be rebuilt offline from our own
+# model.safetensors (the weights are bundled there); from_pretrained is only used at train time.
+DINOV2_SMALL = dict(hidden_size=384, num_hidden_layers=12, num_attention_heads=6, mlp_ratio=4,
+                    patch_size=14, image_size=518, layerscale_value=1.0, layer_norm_eps=1e-6,
+                    hidden_act="gelu", qkv_bias=True, use_swiglu_ffn=False)
+PRETRAINED = {"dinov2-small": ("facebook/dinov2-small", DINOV2_SMALL)}
+
+
+class PretrainedEncoder(nn.Module):
+    """A frozen pretrained ViT with the same output contract as VisionEncoder.
+
+    Used as a comparison (and possibly the release encoder): only the adapter and decoder
+    train on top of it. Patch tokens are pooled and time-tagged exactly like VisionEncoder.
+    """
+
+    def __init__(self, cfg, load_weights=False):
+        super().__init__()
+        from transformers import Dinov2Config, Dinov2Model
+
+        repo, arch = PRETRAINED[cfg.encoder]
+        assert cfg.enc_dim == arch["hidden_size"], f"enc_dim must be {arch['hidden_size']} for {cfg.encoder}"
+        self.vit = Dinov2Model.from_pretrained(repo) if load_weights else Dinov2Model(Dinov2Config(**arch))
+        self.vit.requires_grad_(False)
+        self.patch_size = arch["patch_size"]
+        self.grid = cfg.image_size // self.patch_size
+        assert self.grid * self.patch_size == cfg.image_size and self.grid % cfg.pool == 0
+        self.pool, self.dim, self.max_frames = cfg.pool, cfg.enc_dim, cfg.max_frames
+        # our transforms normalize with mean=std=0.5; DINOv2 expects ImageNet stats
+        self.register_buffer("in_mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1), persistent=False)
+        self.register_buffer("in_std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1), persistent=False)
+        self.register_buffer("time", sincos_1d(cfg.max_frames, cfg.enc_dim)[None, :, None], persistent=False)
+
+    @property
+    def tokens_per_frame(self):
+        return (self.grid // self.pool) ** 2
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.vit.eval()  # frozen: no dropout / stochastic depth, ever
+        return self
+
+    def forward(self, pixels):
+        if pixels.dim() == 4:
+            pixels = pixels.unsqueeze(1)
+        B, T = pixels.shape[:2]
+        assert T <= self.max_frames, f"got {T} frames, max is {self.max_frames}"
+        x = pixels.flatten(0, 1) * 0.5 + 0.5                       # back to [0, 1]
+        x = (x - self.in_mean) / self.in_std
+        with torch.no_grad():
+            x = self.vit(pixel_values=x).last_hidden_state[:, 1:]  # drop CLS -> (B*T, g*g, D)
+        g = self.grid
+        x = x.transpose(1, 2).reshape(B * T, self.dim, g, g)
+        if self.pool > 1:
+            x = F.avg_pool2d(x, self.pool)
+        x = x.flatten(2).transpose(1, 2)
+        x = x.view(B, T, -1, self.dim) + self.time[:, :T]
+        return x.flatten(1, 2)
+
+
+def build_encoder(cfg, load_weights=False):
+    if cfg.encoder == "scratch":
+        return VisionEncoder(cfg)
+    return PretrainedEncoder(cfg, load_weights=load_weights)

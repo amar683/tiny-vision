@@ -4,14 +4,87 @@
 """
 import math
 import random
+import tempfile
 import time
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
 
 from vlm import Captioner, WordTokenizer, get_config
 from vlm.data import ShapesDataset, shape_caption_texts
-from vlm.video import build_timeline, format_timeline
+from vlm.video import build_timeline, format_timeline, sample_frames, sample_scenes
+
+
+def _write_cut_video(path, fps=30, size=(160, 90)):
+    """~20 s video: three static shots with hard cuts at 3.1 s and 16.7 s. Returns cut times."""
+    import cv2
+    import numpy as np
+
+    w, h = size
+    a = np.full((h, w, 3), (40, 40, 200), np.uint8)              # red, white circle
+    cv2.circle(a, (50, 45), 25, (255, 255, 255), -1)
+    b = np.full((h, w, 3), (180, 90, 20), np.uint8)              # blue, yellow box
+    cv2.rectangle(b, (90, 20), (140, 70), (0, 220, 255), -1)
+    c = np.full((h, w, 3), (60, 170, 60), np.uint8)              # green, black triangle
+    cv2.fillPoly(c, [np.array([[30, 80], [80, 10], [130, 80]], np.int32)], (0, 0, 0))
+    shots = [(3.1, a), (13.6, b), (3.3, c)]
+    out = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), fps, (w, h))
+    assert out.isOpened(), "cv2.VideoWriter could not open MJPG writer"
+    n = 0
+    for sec, img in shots:
+        end = round((n / fps + sec) * fps)
+        while n < end:
+            out.write(img)
+            n += 1
+    out.release()
+    return [3.1, 3.1 + 13.6], n / fps
+
+
+def check_video_sampling():
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "cuts.avi"
+        cuts, total = _write_cut_video(path)
+
+        frames, dur = sample_frames(path, every_sec=2.0)
+        times = [t for t, _ in frames]
+        assert abs(dur - total) < 0.1, (dur, total)
+        assert len(times) == 10 and all(abs(t - 2 * i) < 0.05 for i, t in enumerate(times)), times
+
+        frames, dur = sample_scenes(path, threshold=0.3, check_fps=5, min_gap=0.5, max_gap=10.0)
+        times = [t for t, _ in frames]
+        assert abs(dur - total) < 0.1, (dur, total)
+        assert times[0] == 0.0, times
+        for cut in cuts:  # every cut is caught, at most one check step (0.2 s) late
+            assert any(0 <= t - cut <= 0.4 for t in times), (cut, times)
+        # Long static shot 3.1-16.7 s: besides the cut, only the max_gap keep ~10 s later.
+        inside = [t for t in times if cuts[0] + 0.4 < t < cuts[1]]
+        first = next(t for t in times if t >= cuts[0])
+        assert len(inside) == 1 and abs(inside[0] - (first + 10.0)) < 0.25, (inside, times)
+        assert len(times) == 4, times  # start, cut 1, max_gap keep, cut 2
+        print("ok: video sampling, scene keeps at " + ", ".join(f"{t:.1f}s" for t in times))
+
+
+def check_scene_summary():
+    """Shot detection finds the two cuts; a fake captioner groups shots into scenes."""
+    from vlm.scenes import describe_scenes, detect_shots
+
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "cuts.avi"
+        cuts, total = _write_cut_video(path)
+        shots, duration = detect_shots(path, frames_per_shot=3)
+        starts = [s for s, _, _ in shots]
+        assert len(shots) == 3, starts
+        for cut, s in zip(cuts, starts[1:]):
+            assert 0 <= s - cut <= 0.4, (cut, s)
+        assert all(1 <= len(f) <= 3 for _, _, f in shots)
+        # shots 1 and 2 get the same captions -> grouped into one scene; shot 3 differs
+        names = iter(["a dog on grass"] * 3 + ["a dog on grass"] * 3 + ["a car on a road"] * 3)
+        text, data = describe_scenes(path, lambda ims: [next(names) for _ in ims])
+        assert [sc["shots"] for sc in data["scenes"]] == [2, 1], data["scenes"]
+        assert "scene 2" in text and "car" in text
+        print(f"ok: scene summary, shots start at " + ", ".join(f"{t:.1f}s" for t in starts)
+              + f"; {len(data['scenes'])} scenes")
 
 
 def main():
@@ -42,6 +115,10 @@ def main():
     strict = build_timeline([(0, "a green square on the left ."), (3, "a green triangle on the left .")], 6)
     assert len(strict) == 2, "default must not merge captions that differ in a key word"
     print("ok: timeline\n" + format_timeline(segs))
+
+    # 2b. Video frame sampling on a synthetic video with hard cuts.
+    check_video_sampling()
+    check_scene_summary()
 
     # 3. Learning: it must read color, shape AND position from pixels.
     train = ShapesDataset(20000, tok, cfg, seed=1)

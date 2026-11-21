@@ -3,7 +3,8 @@ from dataclasses import dataclass, asdict, replace
 
 @dataclass
 class ModelConfig:
-    # Vision encoder (ViT)
+    # Vision encoder (ViT). "scratch" = our own ViT; "dinov2-small" = frozen pretrained DINOv2-S/14
+    encoder: str = "scratch"
     image_size: int = 224
     patch_size: int = 16
     enc_dim: int = 384

@@ -1,0 +1,247 @@
+{
+  "tiny-vision": {
+    "model": "tiny-vision",
+    "id": "runs/coco_dinov2",
+    "images": 1000,
+    "params_M": 36.1,
+    "trainable_M": 14.0,
+    "weights_MB": 144,
+    "BLEU-4": 0.339,
+    "CIDEr": 1.196,
+    "distinct": 0.93,
+    "gpu_img_per_s": 52.1,
+    "gpu_peak_MB": 1194,
+    "cpu_ms_per_img": 54,
+    "device": "mps",
+    "samples": [
+      [
+        "a man riding a motorcycle down a dirt road.",
+        "A man with a red helmet on a small moped on a dirt road. "
+      ],
+      [
+        "a woman is eating a dessert with a candle.",
+        "A young girl inhales with the intent of blowing out a candle. "
+      ],
+      [
+        "a man is riding a bike next to a train.",
+        "A man on a bicycle riding next to a train"
+      ],
+      [
+        "a kitchen sink with a bunch of items on it",
+        "A kitchen is shown with a variety of items on the counters."
+      ],
+      [
+        "a wooden table topped with wooden cutting boards.",
+        "A wooden ball on top of a wooden stick."
+      ],
+      [
+        "a wooden table with wooden chairs and wooden chairs.",
+        "Multiple wooden spoons are shown on a table top."
+      ],
+      [
+        "a bathroom with a toilet, shower, and sink.",
+        "A bathroom that has a broken wall in the shower."
+      ],
+      [
+        "a bathroom with a shower, toilet and sink.",
+        "A bathroom with an enclosed shower next to a sink and a toilet."
+      ]
+    ]
+  },
+  "tiny-vision (beam 3)": {
+    "model": "tiny-vision (beam 3)",
+    "id": "runs/coco_dinov2",
+    "images": 1000,
+    "params_M": 36.1,
+    "trainable_M": 14.0,
+    "weights_MB": 144,
+    "BLEU-4": 0.348,
+    "CIDEr": 1.213,
+    "distinct": 0.89,
+    "gpu_img_per_s": 24.1,
+    "gpu_peak_MB": 1195,
+    "cpu_ms_per_img": 101,
+    "device": "mps",
+    "samples": [
+      [
+        "a man riding a motorcycle down a dirt road.",
+        "A man with a red helmet on a small moped on a dirt road. "
+      ],
+      [
+        "a woman sitting at a table with a cup of coffee.",
+        "A young girl inhales with the intent of blowing out a candle. "
+      ],
+      [
+        "a man riding a bike next to a train on a track.",
+        "A man on a bicycle riding next to a train"
+      ],
+      [
+        "a kitchen with a sink and a window.",
+        "A kitchen is shown with a variety of items on the counters."
+      ],
+      [
+        "a wooden table topped with lots of wooden utensils.",
+        "A wooden ball on top of a wooden stick."
+      ],
+      [
+        "a wooden table topped with lots of wooden utensils.",
+        "Multiple wooden spoons are shown on a table top."
+      ],
+      [
+        "a bathroom with a toilet, shower, and sink.",
+        "A bathroom that has a broken wall in the shower."
+      ],
+      [
+        "a bathroom with a shower, toilet, and sink.",
+        "A bathroom with an enclosed shower next to a sink and a toilet."
+      ]
+    ]
+  },
+  "florence-2-base": {
+    "model": "florence-2-base",
+    "id": "florence-community/Florence-2-base",
+    "images": 1000,
+    "params_M": 231.4,
+    "trainable_M": null,
+    "weights_MB": 463,
+    "BLEU-4": 0.364,
+    "CIDEr": 1.348,
+    "distinct": 0.95,
+    "gpu_img_per_s": 6.7,
+    "gpu_peak_MB": 6987,
+    "cpu_ms_per_img": 4063,
+    "device": "mps",
+    "samples": [
+      [
+        "A man riding a dirt bike down a dirt road.",
+        "A man with a red helmet on a small moped on a dirt road. "
+      ],
+      [
+        "A little girl sitting at a table with a bowl of ice cream.",
+        "A young girl inhales with the intent of blowing out a candle. "
+      ],
+      [
+        "A man riding a bike next to a train.",
+        "A man on a bicycle riding next to a train"
+      ],
+      [
+        "A kitchen with a sink and a window in it.",
+        "A kitchen is shown with a variety of items on the counters."
+      ],
+      [
+        "A wooden table topped with lots of wooden spoons and forks.",
+        "A wooden ball on top of a wooden stick."
+      ],
+      [
+        "A long wooden table with many wooden spoons on it.",
+        "Multiple wooden spoons are shown on a table top."
+      ],
+      [
+        "A bathroom with a toilet, sink and shower in it.",
+        "A bathroom that has a broken wall in the shower."
+      ],
+      [
+        "A bathroom with a toilet, sink and shower stall.",
+        "A bathroom with an enclosed shower next to a sink and a toilet."
+      ]
+    ]
+  },
+  "florence-2-base (beam 3)": {
+    "model": "florence-2-base (beam 3)",
+    "id": "florence-community/Florence-2-base",
+    "images": 1000,
+    "params_M": 231.4,
+    "trainable_M": null,
+    "weights_MB": 463,
+    "BLEU-4": 0.368,
+    "CIDEr": 1.364,
+    "distinct": 0.94,
+    "gpu_img_per_s": 5.3,
+    "gpu_peak_MB": 7004,
+    "cpu_ms_per_img": 4228,
+    "device": "mps",
+    "samples": [
+      [
+        "A man riding a dirt bike down a dirt road.",
+        "A man with a red helmet on a small moped on a dirt road. "
+      ],
+      [
+        "A little girl sitting at a table with a candle in her mouth.",
+        "A young girl inhales with the intent of blowing out a candle. "
+      ],
+      [
+        "A man riding a bike down a street next to a train.",
+        "A man on a bicycle riding next to a train"
+      ],
+      [
+        "A kitchen with a sink and a window in it.",
+        "A kitchen is shown with a variety of items on the counters."
+      ],
+      [
+        "A wooden table topped with lots of wooden spoons and forks.",
+        "A wooden ball on top of a wooden stick."
+      ],
+      [
+        "A long wooden table with many wooden spoons on it.",
+        "Multiple wooden spoons are shown on a table top."
+      ],
+      [
+        "A bathroom with a toilet, sink and shower in it.",
+        "A bathroom that has a broken wall in the shower."
+      ],
+      [
+        "A bathroom with a toilet, sink and shower stall.",
+        "A bathroom with an enclosed shower next to a sink and a toilet."
+      ]
+    ]
+  },
+  "smolvlm-256m": {
+    "model": "smolvlm-256m",
+    "id": "HuggingFaceTB/SmolVLM-256M-Instruct",
+    "images": 1000,
+    "params_M": 256.5,
+    "trainable_M": null,
+    "weights_MB": 513,
+    "BLEU-4": 0.051,
+    "CIDEr": 0.126,
+    "distinct": 0.99,
+    "gpu_img_per_s": 0.5,
+    "gpu_peak_MB": 23375,
+    "cpu_ms_per_img": 55800,
+    "device": "mps",
+    "samples": [
+      [
+        "In this image I can see a person is sitting on a bike and I can see the road, plants, trees, bridge, mountains and the sky.",
+        "A man with a red helmet on a small moped on a dirt road. "
+      ],
+      [
+        "In this image we can see a woman holding a spoon in her hand and eating a food item and there is a bowl with a food item in it and there is a glass with a drink in it",
+        "A young girl inhales with the intent of blowing out a candle. "
+      ],
+      [
+        "In this image we can see a person riding a bicycle, there is a train, there are poles, wires, trees, and the sky.",
+        "A man on a bicycle riding next to a train"
+      ],
+      [
+        "In this image I can see a kitchen. In the kitchen there are few objects. I can see few windows, few curtains, few objects on the counter, few bottles, few spoons, few knives",
+        "A kitchen is shown with a variety of items on the counters."
+      ],
+      [
+        "In this image we can see wooden objects on the table.",
+        "A wooden ball on top of a wooden stick."
+      ],
+      [
+        "In this image we can see wooden tables, chairs, books, a white wall and a white shelf.",
+        "Multiple wooden spoons are shown on a table top."
+      ],
+      [
+        "In this image I can see a toilet, a sink, a tap, a fan, a box and a few other objects. I can see the tiles on the wall.",
+        "A bathroom that has a broken wall in the shower."
+      ],
+      [
+        "In this image we can see a toilet, a sink, a mirror, a glass door, a wall, a light, a door, a wall, a window, a door, a wall,",
+        "A bathroom with an enclosed shower next to a sink and a toilet."
+      ]
+    ]
+  }
+}
