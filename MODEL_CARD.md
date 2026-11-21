@@ -4,7 +4,6 @@ library_name: pytorch
 pipeline_tag: image-to-text
 datasets:
   - jxie/coco_captions
-base_model: facebook/dinov2-small
 tags:
   - image-captioning
   - video
@@ -22,7 +21,10 @@ description the assistant can read, through MCP (Claude Desktop, Claude Code, Cu
 VS Code, LM Studio and other MCP apps) or as plain text for any LLM. It runs locally, so
 nothing is uploaded.
 
-It's a **36M-parameter** image and video captioner, fast on a laptop CPU.
+It's a **36M-parameter** image and video captioner, fast on a laptop CPU. It uses Meta's
+DINOv2-small as a frozen image encoder (its weights are unchanged, so this is not a
+fine-tune of DINOv2); the adapter and caption decoder on top (14M parameters) were
+trained from scratch on COCO.
 
 - **89% of Florence-2-base's COCO caption score at 1/6 the size**
 - **8× faster on GPU, 75× faster on CPU** (54 ms per image on an Apple M5 CPU)

@@ -7,9 +7,10 @@ and get a real answer. Everything runs locally on your machine: the video never 
 uploaded.
 
 Under the hood it's a **36M-parameter** image and video captioner, small enough to run on
-a laptop CPU. It plugs into any MCP app (Claude Desktop, Claude Code, Cursor, VS Code,
-LM Studio and more; see [where it works](#where-it-works)), and its text output works
-with any LLM at all.
+a laptop CPU. It uses Meta's DINOv2-small as a frozen image encoder (not fine-tuned) and
+adds its own adapter and caption decoder (14M parameters), trained from scratch on COCO.
+It plugs into any MCP app (Claude Desktop, Claude Code, Cursor, VS Code, LM Studio and
+more; see [where it works](#where-it-works)), and its text output works with any LLM at all.
 
 ```
 you: "summarize ~/Movies/trip.mp4"
