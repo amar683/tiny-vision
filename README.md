@@ -18,7 +18,7 @@ more; see [where it works](#where-it-works)), and its text output works with any
 
 **Try it in your browser, no install:**
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/amar683/tiny-vision/blob/main/notebooks/demo.ipynb)
-(free; upload a photo or a video up to 3 minutes)
+(free; upload a photo or a video)
 
 ```
 you: "summarize ~/Movies/trip.mp4"

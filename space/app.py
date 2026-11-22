@@ -1,15 +1,14 @@
-"""tiny-vision demo Space: caption a photo, or turn a short video into a scene-by-scene breakdown."""
+"""tiny-vision demo: caption a photo, or turn a video of any length into a scene-by-scene breakdown."""
 import time
 
 import gradio as gr
 import torch
 
 from caption import caption_images, load_run
-from vlm.scenes import describe_scenes
-from vlm.video import _open
+from vlm.scenes import describe_scenes, video_length
+from vlm.video import _ts
 
 MODEL = "amartomar683/tiny-vision"
-MAX_VIDEO_SEC = 180
 BEAMS = 3
 DEVICE = torch.device("cpu")
 
@@ -28,24 +27,16 @@ def caption_photo(image):
     return cap, f"{(time.time() - t0) * 1000:.0f} ms on CPU"
 
 
-def video_length(path):
-    import cv2
-
-    cap, fps = _open(path)
-    n = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    cap.release()
-    return n / fps if n > 0 else 0.0
-
-
-def summarize_video(path):
+def summarize_video(path, progress=gr.Progress()):
     if not path:
         raise gr.Error("Upload a video first.")
     sec = video_length(path)
-    if sec > MAX_VIDEO_SEC:
-        raise gr.Error(f"This demo takes videos up to {MAX_VIDEO_SEC // 60} minutes (yours is "
-                       f"{sec / 60:.1f}). Run tiny-vision locally for longer videos.")
     t0 = time.time()
-    text, _ = describe_scenes(path, _caption)
+
+    def show(t, total):
+        progress(min(t / total, 1.0) if total else None, desc=f"reading video {_ts(t)} / {_ts(total)}")
+
+    text, _ = describe_scenes(path, _caption, progress=show)
     return text, f"{time.time() - t0:.1f} s for a {sec:.0f} s video on CPU"
 
 
@@ -70,7 +61,7 @@ with gr.Blocks(title="tiny-vision") as demo:
     with gr.Tab("Video → scene breakdown"):
         with gr.Row():
             with gr.Column():
-                vid = gr.Video(label=f"Video (up to {MAX_VIDEO_SEC // 60} min)", sources=["upload"])
+                vid = gr.Video(label="Video (any length; long videos take a few minutes on CPU)", sources=["upload"])
                 vbtn = gr.Button("Describe scenes", variant="primary")
             with gr.Column():
                 vout = gr.Textbox(label="Scene breakdown (paste into any LLM)", lines=22,
