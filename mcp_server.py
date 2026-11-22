@@ -13,19 +13,21 @@ Never print to stdout here: stdout is the MCP protocol channel.
 """
 import os
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
+import anyio  # noqa: E402
 import torch  # noqa: E402
-from mcp.server.mcpserver import MCPServer  # noqa: E402
+from mcp.server.mcpserver import Context, MCPServer  # noqa: E402
 from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
 from PIL import Image, UnidentifiedImageError  # noqa: E402
 
 from caption import VIDEO_EXT, caption_images, load_run  # noqa: E402
 from vlm.scenes import describe_scenes  # noqa: E402
-from vlm.video import build_timeline, format_timeline, sample_frames, sample_scenes  # noqa: E402
+from vlm.video import _ts, build_timeline, format_timeline, sample_frames, sample_scenes  # noqa: E402
 
 HF_REPO = "amartomar683/tiny-vision"  # v1.0 (v0.1: amartomar683/tiny-vision-flickr8k)
 LOCAL_RUN = ROOT / "runs" / "coco_dinov2"
@@ -135,39 +137,61 @@ def describe_video(path: str, mode: str = "scenes", scene_threshold: float = 0.3
 
 
 @server.tool()
-def summarize_video(path: str, scene_threshold: float = 0.3, frames_per_shot: int = 3,
-                    max_shots: int = 300) -> str:
+async def summarize_video(path: str, ctx: Context, scene_threshold: float = 0.3,
+                          frames_per_shot: int = 0, max_scenes: int = 100, max_shots: int = 0) -> str:
     """Understand a local video scene by scene, so you can summarize or answer questions about it.
 
-    Splits the video into shots (hard cuts and slow camera drift), captions several frames
-    per shot (start, middle, end), and groups consecutive shots that show the same thing
-    into scenes. Returns the video length, the subjects that recur across scenes, and for
-    each scene its time range, what is seen and its keywords. Use it to write a summary in
-    your own words, scene by scene. Visual only: there is no audio or speech.
+    Splits the video into shots (hard cuts and slow camera drift), captions frames from
+    each shot, and groups consecutive shots that show the same thing into scenes. Returns
+    the video length, the subjects that recur across scenes, and for each scene its time
+    range, what is seen and its keywords. Use it to write a summary in your own words,
+    scene by scene. Visual only: there is no audio or speech.
+
+    The whole video is always covered. Long or fast-cut videos are condensed: similar
+    neighbouring scenes are merged so the result has at most `max_scenes` scenes. A
+    15-minute video takes about a minute on a laptop; progress is reported while it runs.
 
     Args:
         path: Absolute path to the video (mp4, mov, mkv, avi, webm, m4v).
         scene_threshold: Change score (0-1) that counts as a cut; lower = more scenes.
-        frames_per_shot: Frames captioned per shot (1-5); more = richer but slower.
-        max_shots: Upper bound on shots, to keep very long or fast-cut videos fast.
+        frames_per_shot: Frames captioned per shot (1-5), or 0 to pick by video length
+            (3 up to 10 min, 2 up to 30 min, then 1). More = richer but slower.
+        max_scenes: Merge similar neighbouring scenes down to at most this many (0 = never).
+            Lower it for a shorter overview of a long video.
+        max_shots: Stop after this many shots (0 = no limit, the default). The result
+            says clearly if the video was not covered to the end.
     """
     p = _resolve(path)
     if p.suffix.lower() not in VIDEO_EXT:
         raise ToolError(f"unsupported video type {p.suffix!r}; expected one of {sorted(VIDEO_EXT)}")
     if not 0 < scene_threshold < 1:
         raise ToolError("scene_threshold must be between 0 and 1")
-    if not 1 <= frames_per_shot <= 5:
-        raise ToolError("frames_per_shot must be 1-5")
-    model, tok, cfg = _model()
-    text, data = describe_scenes(
-        p, lambda ims: caption_images(model, tok, cfg, ims, DEVICE, num_beams=BEAMS),
-        threshold=scene_threshold, frames_per_shot=frames_per_shot, max_shots=max_shots)
+    if not 0 <= frames_per_shot <= 5:
+        raise ToolError("frames_per_shot must be 0 (auto) or 1-5")
+    if max_scenes < 0 or max_shots < 0:
+        raise ToolError("max_scenes and max_shots must be >= 0")
+
+    last = [0.0]
+
+    def progress(t, total):  # runs in the worker thread; forwards ~every 2 s of wall time
+        now = time.monotonic()
+        if now - last[0] >= 2.0:
+            last[0] = now
+            msg = f"reading video {_ts(t)} / {_ts(total)}" if total else f"reading video {_ts(t)}"
+            anyio.from_thread.run(ctx.report_progress, t, total or None, msg)
+
+    def work():
+        model, tok, cfg = _model()
+        return describe_scenes(
+            p, lambda ims: caption_images(model, tok, cfg, ims, DEVICE, num_beams=BEAMS),
+            frames_per_shot=frames_per_shot or None, max_scenes=max_scenes, progress=progress,
+            threshold=scene_threshold, max_shots=max_shots)
+
+    await ctx.report_progress(0, None, "loading model and opening video")
+    text, data = await anyio.to_thread.run_sync(work)
     if not data["scenes"]:
         raise ToolError(f"no frames could be read from {p}")
-    if data["overview"]["shots"] >= max_shots:
-        text += f"\n(note: hit max_shots={max_shots}; the rest of the video was not described.)"
     return text
-
 
 def main():
     server.run("stdio")

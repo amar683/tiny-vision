@@ -101,8 +101,12 @@ image / video frames → DINOv2-small (frozen) → 2×2 pool → adapter → 6-l
 
 `summarize_video` (MCP) and `caption.py clip.mp4 --summary` (CLI) do three things:
 - split the video into shots (hard cuts plus slow camera drift)
-- caption the start, middle and end of each shot
+- caption the start, middle and end of each shot (2 frames for videos over 10 minutes, 1 over 30)
 - group consecutive shots that show the same thing into scenes
+
+The whole video is always covered; long or fast-cut videos are condensed to at most 100
+scenes by merging similar neighbours (a 17.5-minute, 338-shot video: about 50 s on an
+Apple M5, 100 scenes).
 
 The output is compact text that an LLM turns into a real summary:
 

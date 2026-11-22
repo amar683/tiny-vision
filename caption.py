@@ -88,6 +88,8 @@ def main():
     ap.add_argument("--summarize", action="store_true",
                     help="video: --summary, then a plain-English summary written by a local LLM")
     ap.add_argument("--llm", default=None, help="model for --summarize (default Qwen2.5-1.5B-Instruct)")
+    ap.add_argument("--max-scenes", type=int, default=100,
+                    help="video, with --summary: merge similar neighbouring scenes down to this many (0 = never)")
     ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     args = ap.parse_args()
 
@@ -96,10 +98,20 @@ def main():
     path = Path(args.path)
 
     if path.suffix.lower() in VIDEO_EXT and (args.summary or args.summarize):
+        import sys
+
         from vlm.scenes import describe_scenes
+        from vlm.video import _ts
+
+        def show(t, total):  # progress on stderr, so stdout stays clean text/JSON
+            if sys.stderr.isatty():
+                print(f"\rreading video {_ts(t)} / {_ts(total)}", end="", file=sys.stderr, flush=True)
+
         text, data = describe_scenes(
             path, lambda ims: caption_images(model, tok, cfg, ims, device, num_beams=args.beams),
-            threshold=args.scene_threshold)
+            max_scenes=args.max_scenes, progress=show, threshold=args.scene_threshold)
+        if sys.stderr.isatty():
+            print("\r" + " " * 40 + "\r", end="", file=sys.stderr)
         summary = None
         if args.summarize:
             from vlm.summarize import DEFAULT_LLM, summarize

@@ -119,6 +119,13 @@ scene 1 [00:00–00:03] (3s)
 ...
 ```
 
+**Long videos.** The whole video is always covered, however long it is: shots are
+captioned as they're found, so memory stays flat. Long or fast-cut videos are condensed by
+merging similar neighbouring scenes, keeping the breakdown to at most 100 scenes
+(`--max-scenes`, or `max_scenes` over MCP). Videos over 10 minutes caption 2 frames per
+shot, and over 30 minutes 1. A 17.5-minute, 338-shot video takes about 50 seconds on an
+Apple M5 and comes out as 100 scenes (about 20 KB of text).
+
 `--summarize` passes that breakdown to a local LLM (default Qwen2.5-1.5B-Instruct, ~3 GB,
 downloaded on first use; pick another with `--llm`) and prints a plain-English summary.
 Over MCP you don't need it, because your assistant writes the summary itself. tiny-vision
@@ -130,7 +137,7 @@ is visual only for now: speech and audio are planned for a later release.
 
 | Tool | Does |
 |---|---|
-| `summarize_video(path, scene_threshold=0.3, frames_per_shot=3, max_shots=300)` | Scene-by-scene breakdown of a local video for the assistant to summarize or answer questions about |
+| `summarize_video(path, scene_threshold=0.3, frames_per_shot=0, max_scenes=100, max_shots=0)` | Scene-by-scene breakdown of a whole local video, any length, for the assistant to summarize or answer questions about. `frames_per_shot=0` picks it by length; long videos are condensed to `max_scenes` |
 | `caption_image(path)` | One-sentence caption of a local image |
 | `describe_video(path, mode="scenes", scene_threshold=0.3, every_seconds=2, max_frames=120)` | Timestamped text timeline of a local video. `mode="scenes"` samples on scene changes; `mode="interval"` samples every `every_seconds` |
 
@@ -150,6 +157,10 @@ Add it to your MCP client's config. Easiest, with [uv](https://docs.astral.sh/uv
 The first start installs dependencies and downloads the model, which can take longer than
 some apps wait. Run `uvx --from git+https://github.com/amar683/tiny-vision tiny-vision --help` once in a terminal first. If the
 app says `uvx` isn't found, use its full path (`which uvx`).
+
+Long videos take a while (about 50 s for 17 minutes on an M5). `summarize_video` sends
+progress updates as it works, which keeps most apps waiting. If yours still gives up early,
+raise its tool timeout; in Claude Code, for example, set `MCP_TOOL_TIMEOUT=300000` (ms).
 
 From a clone instead (use absolute paths):
 

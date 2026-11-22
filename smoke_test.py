@@ -83,8 +83,21 @@ def check_scene_summary():
         text, data = describe_scenes(path, lambda ims: [next(names) for _ in ims])
         assert [sc["shots"] for sc in data["scenes"]] == [2, 1], data["scenes"]
         assert "scene 2" in text and "car" in text
+        assert not data["overview"]["truncated"] and abs(data["overview"]["duration"] - total) < 0.1
+        # Shot limit: says how much was covered and still reports the full length.
+        fake = lambda ims: ["a dog on grass"] * len(ims)
+        text, data = describe_scenes(path, fake, max_shots=1)
+        ov = data["overview"]
+        assert ov["truncated"] and abs(ov["covered"] - cuts[0]) <= 0.4, ov
+        assert abs(ov["duration"] - total) < 0.1 and "NOTE: only 00:00–00:03 of 00:20" in text, text
+        # Condensing: a scene budget of 1 merges everything into one scene spanning the video.
+        caps = iter(["a dog on grass"] * 3 + ["a cat on a sofa"] * 3 + ["a car on a road"] * 3)
+        text, data = describe_scenes(path, lambda ims: [next(caps) for _ in ims], max_scenes=1)
+        (sc,) = data["scenes"]
+        assert data["overview"]["condensed"] and sc["shots"] == 3 and sc["start"] == 0, sc
+        assert abs(sc["end"] - total) < 0.1 and len(sc["captions"]) == 3, sc
         print(f"ok: scene summary, shots start at " + ", ".join(f"{t:.1f}s" for t in starts)
-              + f"; {len(data['scenes'])} scenes")
+              + "; shot limit and condensing work")
 
 
 def main():

@@ -45,54 +45,91 @@ def _shrink(frame, short=320):
     return frame if s >= 1 else cv2.resize(frame, (round(w * s), round(h * s)), interpolation=cv2.INTER_AREA)
 
 
-def detect_shots(path, threshold=0.3, drift=0.55, check_fps=5, min_shot=1.0,
-                 frames_per_shot=3, max_shots=300):
-    """Split a video into shots. Returns ([(start, end, [(t, PIL.Image), ...]), ...], duration).
+def video_length(path):
+    """Duration in seconds from the container (frame count / fps), without decoding. 0 if unknown."""
+    import cv2
+
+    cap, fps = _open(path)
+    n = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    cap.release()
+    return n / fps if n and n > 0 else 0.0
+
+
+def iter_shots(path, threshold=0.3, drift=0.55, check_fps=5, min_shot=1.0,
+               frames_per_shot=3, max_shots=0, info=None, progress=None):
+    """Yield shots (start, end, [(t, PIL.Image), ...]) one by one as the video is read.
 
     A new shot starts on a hard cut (change vs the previous checked frame > threshold) or
     after slow drift (change vs the shot's first frame > drift, e.g. a long pan). Shots
     shorter than min_shot are absorbed. Up to frames_per_shot frames are picked evenly
     from each shot. Only ~check_fps frames/s are decoded, and at most 16 small frames per
-    shot are buffered, so long and high-frame-rate videos stay cheap.
+    shot are buffered, so long and high-frame-rate videos stay cheap. Yielding shots as
+    they close lets the caller caption and drop the images, so memory doesn't grow with
+    the video's length.
+
+    max_shots: stop after this many shots (0 = no limit).
+    info: optional dict, filled with "duration" (whole video, s), "covered" (seconds
+        described) and "truncated" (True if max_shots stopped it early).
+    progress: optional callback(seconds_read) called about once per second of video read.
     """
+    info = {} if info is None else info
     cap, fps = _open(path)
     stride = max(1, round(fps / check_fps)) if check_fps else 1
-    shots, buf = [], []
+    buf, n_shots = [], 0
     start_t = prev_sig = start_sig = None
-    idx, t = 0, 0.0
+    idx, t, last_report = 0, 0.0, 0.0
+    truncated = False
 
-    def close(end):
-        if buf:
-            n = min(frames_per_shot, len(buf))
-            picks = [buf[round(i * (len(buf) - 1) / max(n - 1, 1))] for i in range(n)]
-            shots.append((start_t, end, [(pt, _to_pil(f)) for pt, f in picks]))
+    def picks():
+        n = min(frames_per_shot, len(buf))
+        return [(pt, _to_pil(f)) for pt, f in
+                (buf[round(i * (len(buf) - 1) / max(n - 1, 1))] for i in range(n))]
 
-    while cap.grab():
-        t = _pos_sec(cap, idx, fps)
-        idx += 1
-        if (idx - 1) % stride:
-            continue
-        ok, frame = cap.retrieve()
-        if not ok:
-            continue
-        sig = _signature(frame)
-        if start_t is None:
-            start_t, start_sig = t, sig
-        elif t - start_t >= min_shot and (scene_change_score(prev_sig, sig) > threshold
-                                          or scene_change_score(start_sig, sig) > drift):
-            close(t)
-            if len(shots) >= max_shots:
-                break
-            buf, start_t, start_sig = [], t, sig
-        prev_sig = sig
-        buf.append((t, _shrink(frame)))
-        if len(buf) > 16:          # keep an even spread of at most 16 frames per shot
-            buf = buf[::2]
-    duration = t + 1.0 / fps if idx else 0.0
-    if len(shots) < max_shots:
-        close(duration)
-    cap.release()
-    return shots, duration
+    try:
+        while cap.grab():
+            t = _pos_sec(cap, idx, fps)
+            idx += 1
+            if (idx - 1) % stride:
+                continue
+            ok, frame = cap.retrieve()
+            if not ok:
+                continue
+            if progress and t - last_report >= 1.0:
+                progress(t)
+                last_report = t
+            sig = _signature(frame)
+            if start_t is None:
+                start_t, start_sig = t, sig
+            elif t - start_t >= min_shot and (scene_change_score(prev_sig, sig) > threshold
+                                              or scene_change_score(start_sig, sig) > drift):
+                yield start_t, t, picks()
+                n_shots += 1
+                if max_shots and n_shots >= max_shots:
+                    truncated = True
+                    break
+                buf, start_t, start_sig = [], t, sig
+            prev_sig = sig
+            buf.append((t, _shrink(frame)))
+            if len(buf) > 16:          # keep an even spread of at most 16 frames per shot
+                buf = buf[::2]
+        end = t + 1.0 / fps if idx else 0.0
+        if truncated:
+            info.update(covered=t, truncated=True, duration=max(video_length(path), end))
+        else:
+            if buf:
+                yield start_t, end, picks()
+            info.update(covered=end, truncated=False, duration=end)
+    finally:
+        cap.release()
+
+
+def detect_shots(path, threshold=0.3, drift=0.55, check_fps=5, min_shot=1.0,
+                 frames_per_shot=3, max_shots=0):
+    """All shots at once: ([(start, end, [(t, PIL.Image), ...]), ...], duration). See iter_shots."""
+    info = {}
+    shots = list(iter_shots(path, threshold, drift, check_fps, min_shot, frames_per_shot,
+                            max_shots, info))
+    return shots, info.get("duration", 0.0)
 
 
 def _jaccard(a, b):
@@ -144,13 +181,55 @@ def build_scenes(shots, captions, group_threshold=0.5, intercut_max=5.0):
     return scenes
 
 
-def overview(scenes, duration):
+def _pick_captions(captions, k):
+    """Up to k captions that together cover the most distinct keywords (greedy)."""
+    chosen, covered = [], set()
+    pool = list(dict.fromkeys(captions))
+    while pool and len(chosen) < k:
+        best = max(pool, key=lambda c: len(set(keywords([c], 10)) - covered))
+        chosen.append(best)
+        covered |= set(keywords([best], 10))
+        pool.remove(best)
+    return chosen
+
+
+def condense(scenes, max_scenes, captions_per_scene=3):
+    """Merge neighbouring scenes until at most max_scenes remain, so long videos stay readable.
+
+    Repeatedly merges the adjacent pair that is most alike (keyword overlap), preferring
+    short pairs on ties, so similar stretches collapse first and distinct moments survive.
+    Scenes are left untouched when there are already max_scenes or fewer.
+    """
+    if not max_scenes or len(scenes) <= max_scenes:
+        return scenes
+    sc = [dict(x, _caps=list(x["captions"]), _kw=set(x["keywords"])) for x in scenes]
+    while len(sc) > max_scenes:
+        def score(i):
+            a, b = sc[i], sc[i + 1]
+            return _jaccard(a["_kw"], b["_kw"]) - 1e-4 * (b["end"] - a["start"])
+        i = max(range(len(sc) - 1), key=score)
+        a, b = sc[i], sc.pop(i + 1)
+        a["end"], a["shots"] = b["end"], a["shots"] + b["shots"]
+        a["_caps"] = list(dict.fromkeys(a["_caps"] + b["_caps"]))
+        a["_kw"] = set(keywords(a["_caps"], 8))
+        a["intercut"] = False
+    for x in sc:
+        caps = x.pop("_caps")
+        x.pop("_kw")
+        x["keywords"] = keywords(caps)
+        x["captions"] = _pick_captions(caps, captions_per_scene)
+    return sc
+
+
+def overview(scenes, duration, covered=None, truncated=False, condensed=False):
     seen = Counter()
     for sc in scenes:
         seen.update(set(sc["keywords"]))
     lengths = [sc["end"] - sc["start"] for sc in scenes] or [0]
     return {
-        "duration": duration, "scenes": len(scenes), "shots": sum(sc["shots"] for sc in scenes),
+        "duration": duration, "covered": duration if covered is None else covered,
+        "truncated": truncated, "condensed": condensed,
+        "scenes": len(scenes), "shots": sum(sc["shots"] for sc in scenes),
         "avg_scene_sec": sum(lengths) / len(lengths), "longest_scene_sec": max(lengths),
         "recurring": [(w, n) for w, n in seen.most_common(8) if n > 1],
     }
@@ -159,6 +238,12 @@ def overview(scenes, duration):
 def format_scenes(name, scenes, ov):
     lines = [f"video: {name} · {_ts(ov['duration'])} long · {ov['scenes']} scenes "
              f"({ov['shots']} shots) · avg scene {ov['avg_scene_sec']:.0f}s"]
+    if ov.get("truncated"):
+        lines.append(f"NOTE: only 00:00–{_ts(ov['covered'])} of {_ts(ov['duration'])} is described "
+                     f"(shot limit reached); the rest of the video is missing.")
+    if ov.get("condensed"):
+        lines.append(f"(long video: similar neighbouring scenes were merged to keep this to "
+                     f"{ov['scenes']} scenes)")
     if ov["recurring"]:
         lines.append("recurring: " + ", ".join(f"{w} ({n} scenes)" for w, n in ov["recurring"]))
     for i, sc in enumerate(scenes, 1):
@@ -173,17 +258,45 @@ def format_scenes(name, scenes, ov):
     return "\n".join(lines)
 
 
-def describe_scenes(path, caption_fn, **detect_kw):
-    """Full pipeline. caption_fn(list[PIL.Image]) -> list[str]. Returns (text, data dict)."""
+def auto_frames_per_shot(duration):
+    """Frames captioned per shot by video length: 3 up to 10 min, 2 up to 30 min, then 1."""
+    return 3 if duration <= 600 else 2 if duration <= 1800 else 1
+
+
+def describe_scenes(path, caption_fn, frames_per_shot=None, max_scenes=100, progress=None,
+                    batch=32, **detect_kw):
+    """Full pipeline. caption_fn(list[PIL.Image]) -> list[str]. Returns (text, data dict).
+
+    Shots are captioned in batches as they are found and their images dropped, so a long
+    video is covered end to end with flat memory. frames_per_shot=None picks it from the
+    video's length (auto_frames_per_shot). Videos with more than max_scenes scenes are
+    condensed (see condense) so the text stays a readable size; 0 = never condense.
+    progress: optional callback(seconds_read, total_seconds).
+    """
     from pathlib import Path
 
-    shots, duration = detect_shots(path, **detect_kw)
-    flat = [im for _, _, frames in shots for _, im in frames]
-    caps = caption_fn(flat) if flat else []
-    per_shot, i = [], 0
-    for _, _, frames in shots:
-        per_shot.append(caps[i:i + len(frames)])
-        i += len(frames)
-    scenes = build_scenes(shots, per_shot)
-    ov = overview(scenes, duration)
+    total = video_length(path)
+    fps_shot = frames_per_shot or auto_frames_per_shot(total)
+    info, spans, per_shot, pending = {}, [], [], []   # pending: (shot index, image)
+
+    def flush():
+        caps = caption_fn([im for _, im in pending]) if pending else []
+        for (k, _), c in zip(pending, caps):
+            per_shot[k].append(c)
+        pending.clear()
+
+    report = (lambda t: progress(t, total)) if progress else None
+    for s, e, frames in iter_shots(path, frames_per_shot=fps_shot, info=info, progress=report,
+                                   **detect_kw):
+        spans.append((s, e, None))
+        per_shot.append([])
+        pending.extend((len(spans) - 1, im) for _, im in frames)
+        if len(pending) >= batch:
+            flush()
+    flush()
+    scenes = build_scenes(spans, per_shot)
+    condensed = bool(max_scenes) and len(scenes) > max_scenes
+    scenes = condense(scenes, max_scenes)
+    ov = overview(scenes, info.get("duration", 0.0), info.get("covered"), info.get("truncated", False),
+                  condensed)
     return format_scenes(Path(path).name, scenes, ov), {"overview": ov, "scenes": scenes}
