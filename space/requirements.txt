@@ -1,0 +1,3 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+tiny-vision @ git+https://github.com/amar683/tiny-vision@dbf17c33852fb4cb6c0005bc2e9db27795dd2232

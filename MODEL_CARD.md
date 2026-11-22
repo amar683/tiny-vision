@@ -26,6 +26,11 @@ DINOv2-small as a frozen image encoder (its weights are unchanged, so this is no
 fine-tune of DINOv2); the adapter and caption decoder on top (14M parameters) were
 trained from scratch on COCO.
 
+![tiny-vision turning a video into a scene-by-scene breakdown](https://raw.githubusercontent.com/amar683/tiny-vision/main/assets/demo.gif)
+
+**Try it in your browser, no install:**
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/amar683/tiny-vision/blob/main/notebooks/demo.ipynb)
+
 - **89% of Florence-2-base's COCO caption score at 1/6 the size**
 - **8× faster on GPU, 75× faster on CPU** (54 ms per image on an Apple M5 CPU)
 - 1.2 GB peak GPU memory, 144 MB weights
@@ -126,6 +131,22 @@ yet, so it describes what's seen, not what's said or how things move.
 | a woman sitting at a table with a cup of coffee. | A young girl inhales with the intent of blowing out a candle. *(wrong)* |
 
 ## Usage
+
+Quickest, with [uv](https://docs.astral.sh/uv/) (no clone):
+
+```bash
+uvx --from git+https://github.com/amar683/tiny-vision tiny-vision photo.jpg
+uvx --from git+https://github.com/amar683/tiny-vision tiny-vision clip.mp4 --summary
+```
+
+As an MCP server, add this to your app's MCP config:
+
+```json
+{"mcpServers": {"tiny-vision": {"command": "uvx",
+  "args": ["--from", "git+https://github.com/amar683/tiny-vision", "tiny-vision-mcp"]}}}
+```
+
+From a clone:
 
 ```bash
 git clone https://github.com/amar683/tiny-vision && cd tiny-vision

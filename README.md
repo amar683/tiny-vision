@@ -12,6 +12,12 @@ adds its own adapter and caption decoder (14M parameters), trained from scratch 
 It plugs into any MCP app (Claude Desktop, Claude Code, Cursor, VS Code, LM Studio and
 more; see [where it works](#where-it-works)), and its text output works with any LLM at all.
 
+![tiny-vision turning a video into a scene-by-scene breakdown](assets/demo.gif)
+
+**Try it in your browser, no install:**
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/amar683/tiny-vision/blob/main/notebooks/demo.ipynb)
+(free; upload a photo or a video up to 3 minutes)
+
 ```
 you: "summarize ~/Movies/trip.mp4"
   → tiny-vision splits it into scenes, captions several frames per scene
@@ -44,12 +50,26 @@ limitations are in the [model card](MODEL_CARD.md).
 
 ## Setup
 
+Quickest: run it with [uv](https://docs.astral.sh/uv/), no clone needed (the first run
+installs dependencies, about a minute):
+
+```bash
+uvx --from git+https://github.com/amar683/tiny-vision tiny-vision photo.jpg
+uvx --from git+https://github.com/amar683/tiny-vision tiny-vision clip.mp4 --summary
+```
+
+Or install it with `pip install git+https://github.com/amar683/tiny-vision`, which gives you the `tiny-vision` and
+`tiny-vision-mcp` commands.
+
+To change the code or train, clone it:
+
 ```bash
 git clone https://github.com/amar683/tiny-vision && cd tiny-vision
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
-Runs on Apple Silicon (MPS), NVIDIA (CUDA) or CPU.
+Runs on Apple Silicon (MPS), NVIDIA (CUDA) or CPU. The examples below use the clone
+(`.venv/bin/python caption.py ...`); with the installed version, write `tiny-vision ...` instead.
 
 ## Use the pretrained model
 
@@ -112,7 +132,24 @@ is visual only for now: speech and audio are planned for a later release.
 | `caption_image(path)` | One-sentence caption of a local image |
 | `describe_video(path, mode="scenes", scene_threshold=0.3, every_seconds=2, max_frames=120)` | Timestamped text timeline of a local video. `mode="scenes"` samples on scene changes; `mode="interval"` samples every `every_seconds` |
 
-Add it to your MCP client's config (use absolute paths):
+Add it to your MCP client's config. Easiest, with [uv](https://docs.astral.sh/uv/) (no clone):
+
+```json
+{
+  "mcpServers": {
+    "tiny-vision": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/amar683/tiny-vision", "tiny-vision-mcp"]
+    }
+  }
+}
+```
+
+The first start installs dependencies and downloads the model, which can take longer than
+some apps wait. Run `uvx --from git+https://github.com/amar683/tiny-vision tiny-vision --help` once in a terminal first. If the
+app says `uvx` isn't found, use its full path (`which uvx`).
+
+From a clone instead (use absolute paths):
 
 ```json
 {
@@ -211,6 +248,8 @@ The export writes `model.safetensors` (including the frozen encoder, so it runs 
 - `vlm/data.py`: Hugging Face loader and a synthetic shapes dataset
 - `vlm/tokenizer.py`: word-level tokenizer built from captions
 - `caption.py`, `train.py`, `eval.py`, `bench.py`, `export_hf.py`, `mcp_server.py`, `smoke_test.py`
+- `notebooks/demo.ipynb`: the Colab demo; `space/`: the same Gradio demo as a Hugging Face Space app
+- `pyproject.toml`: packaging (`tiny-vision` and `tiny-vision-mcp` commands)
 
 ## Roadmap
 
