@@ -169,5 +169,9 @@ def summarize_video(path: str, scene_threshold: float = 0.3, frames_per_shot: in
     return text
 
 
-if __name__ == "__main__":
+def main():
     server.run("stdio")
+
+
+if __name__ == "__main__":
+    main()

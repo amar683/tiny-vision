@@ -19,3 +19,8 @@ hf_export/
 .DS_Store
 .vscode/
 .idea/
+
+# Packaging
+dist/
+build/
+*.egg-info/
