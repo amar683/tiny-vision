@@ -44,6 +44,8 @@ else:
 
 server = MCPServer(
     name="tiny-vision",
+    version="1.0.0",
+    website_url="https://github.com/amar683/tiny-vision",
     instructions=(
         "Local tiny vision model (36M params: frozen DINOv2-small encoder + caption decoder "
         "trained on COCO). Gives one-sentence, COCO-style captions of everyday scenes; it "
