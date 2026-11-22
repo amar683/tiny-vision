@@ -65,8 +65,13 @@ def caption_images(model, tok, cfg, images, device, batch_size=16, num_beams=1):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("path")
+    import sys
+
+    if sys.argv[1:] == ["mcp"]:  # `tiny-vision mcp` starts the MCP server (same as tiny-vision-mcp)
+        from mcp_server import main as serve_mcp
+        return serve_mcp()
+    ap = argparse.ArgumentParser(epilog="Run `tiny-vision mcp` to start the MCP server (stdio).")
+    ap.add_argument("path", help="image or video file")
     ap.add_argument("--run", default="amartomar683/tiny-vision")
     ap.add_argument("--every", type=float, default=2.0, help="video: seconds between sampled frames")
     ap.add_argument("--scenes", action="store_true",

@@ -12,7 +12,9 @@ adds its own adapter and caption decoder (14M parameters), trained from scratch 
 It plugs into any MCP app (Claude Desktop, Claude Code, Cursor, VS Code, LM Studio and
 more; see [where it works](#where-it-works)), and its text output works with any LLM at all.
 
-![tiny-vision turning a video into a scene-by-scene breakdown](assets/demo.gif)
+![tiny-vision turning a video into a scene-by-scene breakdown](https://raw.githubusercontent.com/amar683/tiny-vision/main/assets/demo.gif)
+
+<!-- mcp-name: io.github.amar683/tiny-vision -->
 
 **Try it in your browser, no install:**
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/amar683/tiny-vision/blob/main/notebooks/demo.ipynb)

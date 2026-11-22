@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.amar683/tiny-vision",
+  "title": "tiny-vision",
+  "description": "Let your AI assistant watch local videos: scene-by-scene text from a 36M local captioner",
+  "repository": {
+    "url": "https://github.com/amar683/tiny-vision",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "tiny-vision",
+      "version": "1.0.0",
+      "runtimeHint": "uvx",
+      "packageArguments": [{"type": "positional", "value": "mcp"}],
+      "transport": {"type": "stdio"}
+    }
+  ]
+}
