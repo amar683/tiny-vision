@@ -100,6 +100,47 @@ def check_scene_summary():
               + "; shot limit and condensing work")
 
 
+def check_mcp_tools(model, tok, cfg, device):
+    """Call every MCP tool by name through a real MCP client, using the model trained above."""
+    import asyncio
+
+    from PIL import Image
+    from mcp import Client
+
+    import mcp_server
+
+    mcp_server._cache["m"] = (model, tok, cfg)    # use this model instead of downloading v1.0
+    mcp_server.DEVICE = device
+    tools = ("caption_image", "describe_video", "summarize_video")
+
+    async def run(d):
+        img = Path(d) / "shape.png"
+        Image.new("RGB", (64, 64), (200, 30, 30)).save(img)
+        vid = Path(d) / "cuts.avi"
+        _write_cut_video(vid)
+        async with Client(mcp_server.server) as client:
+            listed = {t.name: t for t in (await client.list_tools()).tools}
+            assert set(tools) <= set(listed), listed.keys()
+            for name in tools:
+                a = listed[name].annotations
+                assert a and a.read_only_hint is True and a.destructive_hint is False, (name, a)
+                assert a.idempotent_hint is True and a.open_world_hint is False, (name, a)
+            out = {}
+            for name, path in zip(tools, (img, vid, vid)):
+                res = await client.call_tool(name, {"path": str(path)})
+                assert not res.is_error, (name, res)
+                out[name] = res.content[0].text
+            bad = await client.call_tool("caption_image", {"path": str(Path(d) / "missing.png")})
+            assert bad.is_error, "a missing file must be a tool error"
+        return out
+
+    with tempfile.TemporaryDirectory() as d:
+        out = asyncio.run(run(d))
+    assert out["caption_image"].strip(), out
+    assert "00:00" in out["describe_video"] and "00:20 long" in out["summarize_video"], out
+    print("ok: MCP tools " + ", ".join(tools) + " (annotations, calls, error handling)")
+
+
 def main():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     torch.manual_seed(0)
@@ -168,6 +209,9 @@ def main():
         print(f"  pred: {p:32s} ref: {r}")
     print(f"exact-match accuracy on unseen images: {acc:.0%} (chance ~4%)")
     assert acc > 0.5, "model failed to learn the shapes task"
+
+    # 4. MCP server: every tool, called by name through an MCP client.
+    check_mcp_tools(model, tok, cfg, device)
     print("ALL SMOKE TESTS PASSED")
 
 

@@ -23,6 +23,7 @@ import anyio  # noqa: E402
 import torch  # noqa: E402
 from mcp.server.mcpserver import Context, MCPServer  # noqa: E402
 from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
+from mcp.types import ToolAnnotations  # noqa: E402
 from PIL import Image, UnidentifiedImageError  # noqa: E402
 
 from caption import VIDEO_EXT, caption_images, load_run  # noqa: E402
@@ -57,6 +58,13 @@ server = MCPServer(
 
 _cache = {}
 
+# Every tool only reads a local file and returns text: nothing is changed, the same input gives
+# the same output, and the file is processed locally (the model itself is fetched from Hugging
+# Face once, on first use, unless it is already cached or TINY_VISION_MODEL points to a folder).
+def _hints(title):
+    return ToolAnnotations(title=title, read_only_hint=True, destructive_hint=False,
+                           idempotent_hint=True, open_world_hint=False)
+
 
 def _model():
     if "m" not in _cache:
@@ -73,7 +81,7 @@ def _resolve(path: str) -> Path:
     return p
 
 
-@server.tool()
+@server.tool(title="Caption image", annotations=_hints("Caption image"))
 def caption_image(path: str) -> str:
     """Caption a local image file (jpg, png, ...) with the tiny-vision model.
 
@@ -90,7 +98,7 @@ def caption_image(path: str) -> str:
     return caption_images(model, tok, cfg, [img], DEVICE, num_beams=BEAMS)[0]
 
 
-@server.tool()
+@server.tool(title="Describe video (timeline)", annotations=_hints("Describe video (timeline)"))
 def describe_video(path: str, mode: str = "scenes", scene_threshold: float = 0.3,
                    every_seconds: float = 2.0, max_frames: int = 120,
                    merge_threshold: float = 1.0) -> str:
@@ -138,7 +146,8 @@ def describe_video(path: str, mode: str = "scenes", scene_threshold: float = 0.3
     return f"video: {p.name}, {len(frames)} frames sampled ({mode})\n" + format_timeline(segments) + note
 
 
-@server.tool()
+@server.tool(title="Summarize video (scene by scene)",
+             annotations=_hints("Summarize video (scene by scene)"))
 async def summarize_video(path: str, ctx: Context, scene_threshold: float = 0.3,
                           frames_per_shot: int = 0, max_scenes: int = 100, max_shots: int = 0) -> str:
     """Understand a local video scene by scene, so you can summarize or answer questions about it.
